@@ -13,19 +13,19 @@ Processador de eventos em tempo real que calcula score de risco e bloqueia ativi
 docker compose up --build
 ```
 
+- Inclui `docker-compose.yml` e Dockerfile(s).
 - Healthcheck: http://localhost:8081/api/v1/health
 
-## Contratos de API
-- OpenAPI: docs/api/openapi.yaml
+## Qualidade (pre-commit)
+Este repositorio usa pre-commit para CR + auditoria + anti-slop antes de cada commit.
 
-## Documentacao
-- Project Reference Guide: PROJECT_REFERENCE_GUIDE.md
-- Especificacoes: docs/specs/spec.md
-- Plano tecnico: docs/specs/plan.md
-- Tarefas: docs/specs/tasks.md
-- ADRs: docs/adr/
-- Trade-offs: docs/trade-offs.md
-- Threat model: docs/threat-model.md
-- Performance budget: docs/performance-budget.md
-- Feature flags: docs/feature-flags.md
-- Legacy spec (arquivado): docs/legacy-spec/
+```bash
+pip install pre-commit
+pre-commit install
+```
+
+Para rodar manualmente:
+
+```bash
+pre-commit run --all-files
+```
