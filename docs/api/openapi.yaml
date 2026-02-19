@@ -1,0 +1,111 @@
+openapi: 3.0.3
+info:
+  title: Fraud Detection Simulator API
+  version: 1.0.0
+servers:
+  - url: http://localhost:8081
+paths:
+  /api/v1/health:
+    get:
+      summary: Healthcheck
+      responses:
+        "200":
+          description: Service healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  /api/v1/events:
+    post:
+      summary: Ingest transaction event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventRequest"
+      responses:
+        "202":
+          description: Event accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventAccepted"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/alerts/{alertId}:
+    get:
+      summary: Get fraud alert
+      parameters:
+        - name: alertId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Alert details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AlertResponse"
+        "404":
+          description: Alert not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+components:
+  schemas:
+    EventRequest:
+      type: object
+      required: [eventId, accountId, amount, merchant, country]
+      properties:
+        eventId:
+          type: string
+        accountId:
+          type: string
+        amount:
+          type: number
+          format: double
+        merchant:
+          type: string
+        country:
+          type: string
+    EventAccepted:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ACCEPTED]
+    AlertResponse:
+      type: object
+      properties:
+        alertId:
+          type: string
+        riskScore:
+          type: integer
+        decision:
+          type: string
+          enum: [ALLOW, REVIEW, BLOCK]
+        reasons:
+          type: array
+          items:
+            type: string
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [UP]
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
