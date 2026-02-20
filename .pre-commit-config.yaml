@@ -25,3 +25,9 @@ repos:
         entry: python scripts/anti_slop_check.py
         language: python
         types: [text]
+      - id: asvs-audit-check
+        name: asvs audit check
+        entry: python scripts/asvs_audit_check.py
+        language: python
+        types: [text]
+        always_run: true

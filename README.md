@@ -17,7 +17,7 @@ docker compose up --build
 - Healthcheck: http://localhost:8081/api/v1/health
 
 ## Qualidade (pre-commit)
-Este repositorio usa pre-commit para CR + auditoria + anti-slop antes de cada commit.
+Este repositorio usa pre-commit para CR + auditoria ASVS (OWASP ASVS v5.0.0) antes de cada commit.
 
 ```bash
 pip install pre-commit
