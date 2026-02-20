@@ -22,12 +22,12 @@ repos:
     hooks:
       - id: anti-slop-check
         name: anti-slop check
-        entry: python scripts/anti_slop_check.py
+        entry: python scripts/pre_commit_checks.py anti-slop
         language: python
         types: [text]
       - id: asvs-audit-check
         name: asvs audit check
-        entry: python scripts/asvs_audit_check.py
+        entry: python scripts/pre_commit_checks.py asvs-audit
         language: python
         types: [text]
         always_run: true
