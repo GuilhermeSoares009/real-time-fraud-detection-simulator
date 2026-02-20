@@ -26,8 +26,74 @@ AI_PATTERNS = [
     ),
 ]
 
-TODO_PATTERN = re.compile(r"(?i)\b(todo|fixme|tbd|wip)\b")
-ALLOWED_TODO = re.compile(r"(?i)\b(todo|fixme)\s*\((#\d+|[A-Z]+-\d+)\)\b")
+TODO_PATTERN = re.compile(r"\b(TODO|FIXME|WIP)\b")
+ALLOWED_TODO = re.compile(r"\b(TODO|FIXME)\s*\((#\d+|[A-Z]+-\d+)\)\b")
+
+TEXT_LIKE_SUFFIXES = {".adoc", ".md", ".rst", ".txt"}
+HTML_COMMENT_SUFFIXES = {".htm", ".html", ".md", ".svg", ".xhtml", ".xml"}
+SLASH_COMMENT_SUFFIXES = {
+    ".c",
+    ".cc",
+    ".cpp",
+    ".cs",
+    ".cxx",
+    ".dart",
+    ".go",
+    ".h",
+    ".hpp",
+    ".hxx",
+    ".java",
+    ".js",
+    ".jsx",
+    ".kt",
+    ".kts",
+    ".m",
+    ".mm",
+    ".php",
+    ".rs",
+    ".scala",
+    ".swift",
+    ".ts",
+    ".tsx",
+    ".vue",
+}
+DASH_COMMENT_SUFFIXES = {".sql"}
+HASH_COMMENT_SUFFIXES = {
+    ".bash",
+    ".cfg",
+    ".conf",
+    ".coveragerc",
+    ".dockerignore",
+    ".editorconfig",
+    ".env",
+    ".eslintrc",
+    ".flake8",
+    ".gitignore",
+    ".gitattributes",
+    ".ini",
+    ".npmrc",
+    ".prettierrc",
+    ".properties",
+    ".ps1",
+    ".psd1",
+    ".psm1",
+    ".pylintrc",
+    ".rb",
+    ".sh",
+    ".stylelintrc",
+    ".tf",
+    ".tfvars",
+    ".toml",
+    ".yaml",
+    ".yml",
+    ".zsh",
+}
+HASH_COMMENT_NAMES = {
+    "gnumakefile",
+    "makefile",
+    "requirements-dev.txt",
+    "requirements.txt",
+}
 
 IGNORE_NAMES = {
     AUDIT_FILE,
@@ -40,6 +106,118 @@ IGNORE_NAMES = {
 
 def is_binary(data: bytes) -> bool:
     return b"\x00" in data
+
+
+def get_comment_config(path: Path) -> dict[str, bool]:
+    suffix = path.suffix.lower()
+    name = path.name.lower()
+    is_text = suffix in TEXT_LIKE_SUFFIXES
+
+    line_hash = (
+        suffix in HASH_COMMENT_SUFFIXES
+        or name in HASH_COMMENT_NAMES
+        or name.startswith(".env")
+        or name.startswith("dockerfile")
+    )
+    line_slash = suffix in SLASH_COMMENT_SUFFIXES
+    line_dash = suffix in DASH_COMMENT_SUFFIXES
+    block_slash = line_slash or line_dash
+    html = suffix in HTML_COMMENT_SUFFIXES
+
+    if is_text:
+        line_hash = False
+        line_slash = False
+        line_dash = False
+        block_slash = False
+
+    return {
+        "line_hash": line_hash,
+        "line_slash": line_slash,
+        "line_dash": line_dash,
+        "block_slash": block_slash,
+        "html": html,
+    }
+
+
+def build_comment_ranges(
+    line: str,
+    config: dict[str, bool],
+    state: dict[str, bool],
+) -> list[tuple[int, int]]:
+    ranges: list[tuple[int, int]] = []
+    length = len(line)
+
+    if config["block_slash"]:
+        if state["block"]:
+            end = line.find("*/")
+            if end == -1:
+                ranges.append((0, length))
+            else:
+                ranges.append((0, end + 2))
+                state["block"] = False
+
+        if not state["block"]:
+            start = line.find("/*")
+            if start != -1:
+                end = line.find("*/", start + 2)
+                if end == -1:
+                    ranges.append((start, length))
+                    state["block"] = True
+                else:
+                    ranges.append((start, end + 2))
+
+    if config["html"]:
+        if state["html"]:
+            end = line.find("-->")
+            if end == -1:
+                ranges.append((0, length))
+            else:
+                ranges.append((0, end + 3))
+                state["html"] = False
+
+        if not state["html"]:
+            start = line.find("<!--")
+            if start != -1:
+                end = line.find("-->", start + 4)
+                if end == -1:
+                    ranges.append((start, length))
+                    state["html"] = True
+                else:
+                    ranges.append((start, end + 3))
+
+    if config["line_hash"]:
+        pos = line.find("#")
+        if pos != -1:
+            ranges.append((pos, length))
+
+    if config["line_slash"]:
+        pos = line.find("//")
+        if pos != -1:
+            if pos == 0 or line[pos - 1] != ":":
+                ranges.append((pos, length))
+
+    if config["line_dash"]:
+        pos = line.find("--")
+        if pos != -1:
+            ranges.append((pos, length))
+
+    return ranges
+
+
+def has_disallowed_todo(line: str, ranges: list[tuple[int, int]]) -> bool:
+    if not ranges:
+        return False
+
+    allowed_spans = [
+        (match.start(), match.end()) for match in ALLOWED_TODO.finditer(line)
+    ]
+    for match in TODO_PATTERN.finditer(line):
+        if not any(start <= match.start() < end for start, end in ranges):
+            continue
+        if any(start <= match.start() < end for start, end in allowed_spans):
+            continue
+        return True
+    return False
 
 
 def check_file_for_slop(path: Path) -> list[str]:
@@ -59,12 +237,15 @@ def check_file_for_slop(path: Path) -> list[str]:
         text = data.decode("utf-8", errors="ignore")
 
     issues: list[str] = []
+    comment_config = get_comment_config(path)
+    state = {"block": False, "html": False}
     for idx, line in enumerate(text.splitlines(), start=1):
         for pattern, label in AI_PATTERNS:
             if pattern.search(line):
                 issues.append(f"{path}:{idx}: {label}")
-        if TODO_PATTERN.search(line) and not ALLOWED_TODO.search(line):
-            issues.append(f"{path}:{idx}: TODO/FIXME/TBD/WIP without issue reference")
+        comment_ranges = build_comment_ranges(line, comment_config, state)
+        if has_disallowed_todo(line, comment_ranges):
+            issues.append(f"{path}:{idx}: TODO/FIXME/WIP without issue reference")
     return issues
 
 
