@@ -2,6 +2,7 @@ EXPLICACAO_DIDATICA.md
 AGENTS.md
 PROJECT_REFERENCE_GUIDE.md
 docs/
+specs/
 .codex/
 .specify/
 .env
@@ -20,3 +21,8 @@ out/
 coverage/
 target/
 bin/
+*.class
+*.jar
+*.war
+*.ear
+.gradle/
