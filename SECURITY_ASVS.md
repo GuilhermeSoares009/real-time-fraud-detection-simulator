@@ -9,3 +9,4 @@ Scope: Application services, configuration, and data flows.
 - 2026-02-20: Baseline review established. References: v5.0.0-1.2.5
 - 2026-02-20: Refine anti-slop TODO detection to avoid false positives in comments. References: v5.0.0-1.2.5
 - 2026-02-20: Unified pre-commit checks. References: v5.0.0-1.2.5
+- 2026-02-20: Add transaction ingestion and alert APIs with validation and rate limiting. References: v5.0.0-1.2.5
